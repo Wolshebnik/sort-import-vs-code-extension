@@ -4,46 +4,46 @@
   <img src="./icon.png" alt="Sort Imports Logo" width="128" />
 </p>
 
-Автоматически сортирует и организует импорты в JavaScript и TypeScript файлах по длине строки.
+Automatically sorts and organizes imports in JavaScript and TypeScript files by line length.
 
-## Возможности
+## Features
 
-- 🚀 **Умная сортировка:** Импорты группируются по типам и сортируются по длине
-- ⚙️ **Настраиваемость:** Возможность изменить максимальную длину строки и алиасы путей
-- ⌨️ **Горячие клавиши:** Ctrl+Alt+O (Windows/Linux) или Cmd+Alt+O (macOS)
-- 📝 **Контекстное меню:** Команда доступна в контекстном меню редактора
-- 🎯 **Поддержка форматирования:** Работает как провайдер форматирования
+- 🚀 **Smart Sorting:** Imports are grouped by type and sorted by length
+- ⚙️ **Configurable:** Ability to change maximum line length and path aliases
+- ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
+- 📝 **Context Menu:** Command available in editor context menu
+- 🎯 **Format Provider:** Works as a formatting provider
 
-## Группировка импортов
+## Import Grouping
 
-Импорты группируются в следующем порядке:
+Imports are grouped in the following order:
 
-1. **Директивы** — 'use client', 'use server'
-2. **React** — react и react/\*
-3. **Внешние библиотеки** — npm пакеты
-4. **Абсолютные импорты** — пути с алиасами (@/, ~)
-5. **Относительные импорты** — локальные файлы (., ..)
-6. **Side effect импорты** — импорты без from
-7. **Стили** — CSS, SCSS, SASS, LESS файлы
+1. **Directives** — 'use client', 'use server'
+2. **React** — react and react/*
+3. **External Libraries** — npm packages
+4. **Absolute Imports** — paths with aliases (@/, ~)
+5. **Relative Imports** — local files (., ..)
+6. **Side Effect Imports** — imports without from
+7. **Styles** — CSS, SCSS, SASS, LESS files
 
-## Настройки
+## Settings
 
-Вы можете настроить расширение через настройки VS Code:
+You can configure the extension through VS Code settings:
 
 ```json
 {
-  "sortImports.maxLineLength": 100, // Максимальная длина строки импорта
-  "sortImports.aliasPrefixes": ["@/", "~"] // Префиксы для абсолютных путей
+  "sortImports.maxLineLength": 100, // Maximum import line length
+  "sortImports.aliasPrefixes": ["@/", "~"] // Prefixes for absolute paths
 }
 ```
 
-## Демонстрация
+## Demo
 
 ![Sort Imports Demo](./demo.gif)
 
-## Пример работы
+## Example
 
-**До:**
+**Before:**
 
 ```ts
 import './styles.css';
@@ -54,7 +54,7 @@ import { apiCall } from '@/services/api';
 import lodash from 'lodash';
 ```
 
-**После:**
+**After:**
 
 ```ts
 import { Component } from 'react';
@@ -69,25 +69,25 @@ import { someUtilFunction, anotherFunction } from '../utils/helpers';
 import './styles.css';
 ```
 
-## Использование
+## Usage
 
-- Откройте файл .js, .ts, .jsx или .tsx
-- Вызовите команду **Sort Imports** через палитру команд (Cmd+Shift+P / Ctrl+Shift+P)
-- Или используйте горячие клавиши: `Cmd+Alt+O` (Mac) / `Ctrl+Alt+O` (Windows/Linux)
-- Также доступно в контекстном меню редактора
+- Open a .js, .ts, .jsx or .tsx file
+- Run **Sort Imports** command via command palette (Cmd+Shift+P / Ctrl+Shift+P)
+- Or use keyboard shortcuts: `Cmd+Alt+O` (Mac) / `Ctrl+Alt+O` (Windows/Linux)
+- Also available in editor context menu
 
-## Поддерживаемые файлы
+## Supported Files
 
 - JavaScript (.js)
 - TypeScript (.ts)
 - JSX (.jsx)
 - TSX (.tsx)
 
-## Требования
+## Requirements
 
-- VS Code версии 1.74.0 или выше
-- Файлы JavaScript/TypeScript
+- VS Code version 1.74.0 or higher
+- JavaScript/TypeScript files
 
-## Лицензия
+## License
 
 MIT
