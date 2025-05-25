@@ -84,15 +84,23 @@ export class SortImportsProvider {
     groups: ImportGroups
   ): number {
     let idx = startIdx;
+    let foundDirective = false;
+
+    // Ищем директивы по всему блоку импортов, не только в начале
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const directive = line.match(/^['"](use (?:client|server))['"]\.?;?$/i);
+      if (directive) {
+        groups.directives.push(`'${directive[1]}';`);
+        // Удаляем найденную директиву из исходного массива
+        lines[i] = '';
+        foundDirective = true;
+        break; // Берем только первую найденную директиву
+      }
+    }
 
     // Пропускаем пустые строки в начале
     while (lines[idx]?.trim() === '') idx++;
-
-    const directive = lines[idx]?.match(/^['"]use (client|server)['"];?/i);
-    if (directive) {
-      groups.directives.push(directive[0].replace(/;+$/, ''));
-      idx++;
-    }
 
     return idx;
   }
@@ -217,9 +225,8 @@ export class SortImportsProvider {
       output.push(...groups.react.sort(sortByLength));
     }
 
-    // 3. Библиотеки (с пустой строкой перед, если есть React импорты)
+    // 3. Библиотеки (без пустой строки после React импортов)
     if (groups.libraries.length) {
-      if (groups.react.length) output.push('');
       output.push(...groups.libraries.sort(sortByLength));
     }
 
