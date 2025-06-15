@@ -1,8 +1,8 @@
 {
   "name": "sort-imports",
   "displayName": "Sort All Imports by length",
-  "description": "Automatically sort and organize imports in JavaScript and TypeScript files with comment preservation",
-  "version": "1.1.0",
+  "description": "Automatically sort and organize imports in JavaScript and TypeScript files with comment and interface preservation",
+  "version": "1.2.2",
   "engines": {
     "vscode": "^1.74.0"
   },

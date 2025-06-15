@@ -9,6 +9,7 @@ interface ImportGroups {
   sideEffect: string[];
   styles: string[];
   comments: { line: string; originalIndex: number }[];
+  interfaces: string[];
 }
 
 export class SortImportsProvider {
@@ -68,12 +69,13 @@ export class SortImportsProvider {
       sideEffect: [],
       styles: [],
       comments: [],
+      interfaces: [],
     };
 
     // Обработка директив use client/server
     idx = this.processDirectives(lines, idx, groups);
 
-    // Обработка импортов
+    // Обработка импортов и интерфейсов
     idx = this.processImports(lines, idx, groups, config);
 
     // Формирование результата
@@ -136,6 +138,46 @@ export class SortImportsProvider {
         continue;
       }
 
+      // Проверяем на интерфейс (с поддержкой export)
+      if (line.startsWith('interface ') || line.startsWith('export interface ')) {
+        let interfaceBlock = '';
+        let braceCount = 0;
+        let foundOpenBrace = false;
+
+        // Собираем весь блок интерфейса
+        while (idx < lines.length) {
+          const currentLine = lines[idx];
+          interfaceBlock += currentLine + '\n';
+
+          // Подсчитываем фигурные скобки
+          for (const char of currentLine) {
+            if (char === '{') {
+              braceCount++;
+              foundOpenBrace = true;
+            } else if (char === '}') {
+              braceCount--;
+            }
+          }
+
+          idx++;
+
+          // Если нашли открывающую скобку и количество скобок сбалансировано
+          if (foundOpenBrace && braceCount === 0) {
+            break;
+          }
+        }
+
+        // Сортируем интерфейс и добавляем в группу
+        const sortedInterface = this.sortInterfaceProperties(
+          interfaceBlock.trim(),
+          config
+        );
+        groups.interfaces.push(sortedInterface);
+        originalIndex++;
+        continue;
+      }
+
+      // Если это не импорт, значит закончились импорты
       if (!line.startsWith('import')) break;
 
       let importBlock = '';
@@ -150,6 +192,43 @@ export class SortImportsProvider {
     }
 
     return idx;
+  }
+
+  private sortInterfaceProperties(interfaceBlock: string, config: any): string {
+    const lines = interfaceBlock.split('\n');
+
+    // Находим строку с открывающей скобкой
+    let headerEndIndex = -1;
+    let footerStartIndex = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('{') && headerEndIndex === -1) {
+        headerEndIndex = i;
+      }
+      if (lines[i].includes('}') && headerEndIndex !== -1) {
+        footerStartIndex = i;
+        break;
+      }
+    }
+
+    if (headerEndIndex === -1 || footerStartIndex === -1) {
+      return interfaceBlock; // Не удалось найти скобки, возвращаем как есть
+    }
+
+    // Извлекаем заголовок, свойства и футер
+    const header = lines.slice(0, headerEndIndex + 1);
+    const footer = lines.slice(footerStartIndex);
+    const properties = lines.slice(headerEndIndex + 1, footerStartIndex);
+
+    // Фильтруем и сортируем свойства по длине
+    const sortedProperties = properties
+      .filter((line) => line.trim()) // Убираем пустые строки
+      .sort((a, b) => a.trim().length - b.trim().length);
+
+    // Собираем результат
+    const result = [...header, ...sortedProperties, ...footer].join('\n');
+
+    return result;
   }
 
   private classifyImport(
@@ -290,8 +369,8 @@ export class SortImportsProvider {
       output.push(...groups.styles.sort(sortByLength));
     }
 
-    // 8. Комментарии в исходном порядке (после всех импортов)
-    if (groups.comments.length) {
+    // 8. Интерфейсы (после всех импортов)
+    if (groups.interfaces.length) {
       if (
         groups.react.length ||
         groups.libraries.length ||
@@ -299,6 +378,23 @@ export class SortImportsProvider {
         groups.relative.length ||
         groups.sideEffect.length ||
         groups.styles.length
+      ) {
+        output.push('');
+      }
+
+      output.push(...groups.interfaces);
+    }
+
+    // 9. Комментарии в исходном порядке (в самом конце)
+    if (groups.comments.length) {
+      if (
+        groups.react.length ||
+        groups.libraries.length ||
+        groups.absolute.length ||
+        groups.relative.length ||
+        groups.sideEffect.length ||
+        groups.styles.length ||
+        groups.interfaces.length
       ) {
         output.push('');
       }
@@ -321,7 +417,8 @@ export class SortImportsProvider {
         groups.relative.length ||
         groups.sideEffect.length ||
         groups.styles.length ||
-        groups.comments.length)
+        groups.comments.length ||
+        groups.interfaces.length)
     ) {
       output.push('');
     }

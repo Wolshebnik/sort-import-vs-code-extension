@@ -10,6 +10,7 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 
 - 🚀 **Smart Sorting:** Imports are grouped by type and sorted by length
 - 💬 **Comment Preservation:** Comments within import blocks are preserved in their original order
+- 🔧 **Interface Sorting:** Interface properties are sorted by length within the interface body
 - ⚙️ **Configurable:** Ability to change maximum line length and path aliases
 - ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
 - 📝 **Context Menu:** Command available in editor context menu
@@ -26,7 +27,8 @@ Imports are grouped in the following order:
 5. **Relative Imports** — local files (., ..)
 6. **Side Effect Imports** — imports without from
 7. **Styles** — CSS, SCSS, SASS, LESS files
-8. **Comments** — preserved in their original order after import groups
+8. **Interfaces** — TypeScript interfaces (including export interface) with properties sorted by length
+9. **Comments** — preserved in their original order at the very end
 
 ## Settings
 
@@ -56,6 +58,14 @@ import axios from 'axios';
 /* Comment about API service */
 import { apiCall } from '@/services/api';
 import lodash from 'lodash';
+
+interface User {
+  verylongpropertynamefortest: string;
+  id: number;
+  name: string;
+  email: string;
+  age: number;
+}
 ```
 
 **After:**
@@ -71,6 +81,14 @@ import { apiCall } from '@/services/api';
 import { someUtilFunction, anotherFunction } from '../utils/helpers';
 
 import './styles.css';
+
+interface User {
+  id: number;
+  age: number;
+  name: string;
+  email: string;
+  verylongpropertynamefortest: string;
+}
 
 // Comment about utils
 /* Comment about API service */
