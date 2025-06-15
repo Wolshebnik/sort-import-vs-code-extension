@@ -10,6 +10,7 @@ interface ImportGroups {
   styles: string[];
   comments: { line: string; originalIndex: number }[];
   interfaces: string[];
+  functions: string[];
 }
 
 export class SortImportsProvider {
@@ -70,6 +71,7 @@ export class SortImportsProvider {
       styles: [],
       comments: [],
       interfaces: [],
+      functions: [],
     };
 
     // Обработка директив use client/server
@@ -139,7 +141,10 @@ export class SortImportsProvider {
       }
 
       // Проверяем на интерфейс (с поддержкой export)
-      if (line.startsWith('interface ') || line.startsWith('export interface ')) {
+      if (
+        line.startsWith('interface ') ||
+        line.startsWith('export interface ')
+      ) {
         let interfaceBlock = '';
         let braceCount = 0;
         let foundOpenBrace = false;
@@ -173,6 +178,52 @@ export class SortImportsProvider {
           config
         );
         groups.interfaces.push(sortedInterface);
+        originalIndex++;
+        continue;
+      }
+
+      // Проверяем на функции
+      if (
+        line.startsWith('export const ') ||
+        line.startsWith('const ') ||
+        line.startsWith('export function ') ||
+        line.startsWith('function ') ||
+        line.startsWith('export default ') ||
+        line.startsWith('export {')
+      ) {
+        let functionBlock = '';
+        let braceCount = 0;
+        let foundOpenBrace = false;
+
+        // Собираем весь блок функции
+        while (idx < lines.length) {
+          const currentLine = lines[idx];
+          functionBlock += currentLine;
+
+          // Подсчитываем фигурные скобки
+          for (const char of currentLine) {
+            if (char === '{') {
+              braceCount++;
+              foundOpenBrace = true;
+            } else if (char === '}') {
+              braceCount--;
+            }
+          }
+
+          idx++;
+
+          // Если нашли открывающую скобку и количество скобок сбалансировано
+          if (foundOpenBrace && braceCount === 0) {
+            break;
+          }
+
+          // Если это не первая строка, добавляем перенос
+          if (idx < lines.length) {
+            functionBlock += '\n';
+          }
+        }
+
+        groups.functions.push(functionBlock);
         originalIndex++;
         continue;
       }
@@ -385,7 +436,7 @@ export class SortImportsProvider {
       output.push(...groups.interfaces);
     }
 
-    // 9. Комментарии в исходном порядке (в самом конце)
+    // 9. Комментарии в исходном порядке (после интерфейсов)
     if (groups.comments.length) {
       if (
         groups.react.length ||
@@ -407,6 +458,29 @@ export class SortImportsProvider {
       output.push(...sortedComments);
     }
 
+    // 10. Функции (в самом конце)
+    if (groups.functions.length) {
+      if (
+        groups.react.length ||
+        groups.libraries.length ||
+        groups.absolute.length ||
+        groups.relative.length ||
+        groups.sideEffect.length ||
+        groups.styles.length ||
+        groups.interfaces.length ||
+        groups.comments.length
+      ) {
+        output.push('');
+      }
+
+      // Добавляем функции с пустыми строками между ними
+      groups.functions.forEach((func, index) => {
+        output.push(func);
+        // Добавляем пустую строку после каждой функции (включая последнюю)
+        output.push('');
+      });
+    }
+
     // Добавляем пустую строку после импортов, если есть другой код
     const rest = lines.slice(startIdx).join('\n').trim();
     if (
@@ -418,7 +492,8 @@ export class SortImportsProvider {
         groups.sideEffect.length ||
         groups.styles.length ||
         groups.comments.length ||
-        groups.interfaces.length)
+        groups.interfaces.length ||
+        groups.functions.length)
     ) {
       output.push('');
     }
