@@ -8,6 +8,7 @@ interface ImportGroups {
   relative: string[];
   sideEffect: string[];
   styles: string[];
+  comments: { line: string; originalIndex: number }[];
 }
 
 export class SortImportsProvider {
@@ -66,6 +67,7 @@ export class SortImportsProvider {
       relative: [],
       sideEffect: [],
       styles: [],
+      comments: [],
     };
 
     // Обработка директив use client/server
@@ -112,13 +114,28 @@ export class SortImportsProvider {
     config: any
   ): number {
     let idx = startIdx;
+    let originalIndex = 0;
 
     while (idx < lines.length) {
       const line = lines[idx].trim();
       if (!line) {
         idx++;
+        originalIndex++;
         continue;
       }
+
+      // Проверяем на комментарий
+      if (
+        line.startsWith('//') ||
+        line.startsWith('/*') ||
+        line.startsWith('*')
+      ) {
+        groups.comments.push({ line: lines[idx], originalIndex });
+        idx++;
+        originalIndex++;
+        continue;
+      }
+
       if (!line.startsWith('import')) break;
 
       let importBlock = '';
@@ -129,6 +146,7 @@ export class SortImportsProvider {
       }
 
       this.classifyImport(importBlock.trim(), groups, config);
+      originalIndex++;
     }
 
     return idx;
@@ -272,6 +290,27 @@ export class SortImportsProvider {
       output.push(...groups.styles.sort(sortByLength));
     }
 
+    // 8. Комментарии в исходном порядке (после всех импортов)
+    if (groups.comments.length) {
+      if (
+        groups.react.length ||
+        groups.libraries.length ||
+        groups.absolute.length ||
+        groups.relative.length ||
+        groups.sideEffect.length ||
+        groups.styles.length
+      ) {
+        output.push('');
+      }
+
+      // Сортируем комментарии по исходному порядку
+      const sortedComments = groups.comments
+        .sort((a, b) => a.originalIndex - b.originalIndex)
+        .map((comment) => comment.line);
+
+      output.push(...sortedComments);
+    }
+
     // Добавляем пустую строку после импортов, если есть другой код
     const rest = lines.slice(startIdx).join('\n').trim();
     if (
@@ -281,7 +320,8 @@ export class SortImportsProvider {
         groups.absolute.length ||
         groups.relative.length ||
         groups.sideEffect.length ||
-        groups.styles.length)
+        groups.styles.length ||
+        groups.comments.length)
     ) {
       output.push('');
     }

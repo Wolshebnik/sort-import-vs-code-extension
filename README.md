@@ -9,6 +9,7 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 ## Features
 
 - 🚀 **Smart Sorting:** Imports are grouped by type and sorted by length
+- 💬 **Comment Preservation:** Comments within import blocks are preserved in their original order
 - ⚙️ **Configurable:** Ability to change maximum line length and path aliases
 - ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
 - 📝 **Context Menu:** Command available in editor context menu
@@ -19,12 +20,13 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 Imports are grouped in the following order:
 
 1. **Directives** — 'use client', 'use server'
-2. **React** — react and react/*
+2. **React** — react and react/\*
 3. **External Libraries** — npm packages
 4. **Absolute Imports** — paths with aliases (@/, ~)
 5. **Relative Imports** — local files (., ..)
 6. **Side Effect Imports** — imports without from
 7. **Styles** — CSS, SCSS, SASS, LESS files
+8. **Comments** — preserved in their original order after import groups
 
 ## Settings
 
@@ -48,8 +50,10 @@ You can configure the extension through VS Code settings:
 ```ts
 import './styles.css';
 import { Component } from 'react';
+// Comment about utils
 import { someUtilFunction, anotherFunction } from '../utils/helpers';
 import axios from 'axios';
+/* Comment about API service */
 import { apiCall } from '@/services/api';
 import lodash from 'lodash';
 ```
@@ -67,6 +71,9 @@ import { apiCall } from '@/services/api';
 import { someUtilFunction, anotherFunction } from '../utils/helpers';
 
 import './styles.css';
+
+// Comment about utils
+/* Comment about API service */
 ```
 
 ## Usage
