@@ -1,7 +1,7 @@
 {
   "name": "sort-imports",
-  "displayName": "Sort All Imports by length",
-  "description": "Automatically sort and organize imports in JavaScript and TypeScript files with comment and interface preservation",
+  "displayName": "Automatic Import Sorter",
+  "description": "Automatically sort and organize JavaScript/TypeScript imports with smart grouping and configurable modes",
   "version": "1.3.3",
   "engines": {
     "vscode": "^1.74.0"
@@ -69,6 +69,15 @@
             "src/"
           ],
           "description": "Prefixes that should be treated as absolute imports"
+        },
+        "sortImports.sortMode": {
+          "type": "string",
+          "enum": [
+            "length",
+            "alphabetical"
+          ],
+          "default": "length",
+          "description": "Sorting mode for imports and named specifiers: by length (default) or alphabetically"
         }
       }
     }

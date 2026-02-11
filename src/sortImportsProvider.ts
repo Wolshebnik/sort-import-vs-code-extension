@@ -17,6 +17,7 @@ interface SortConfig {
   maxLineLength: number;
   indent: string;
   aliasPrefixes: string[];
+  sortMode: 'length' | 'alphabetical';
 }
 
 export class SortImportsProvider {
@@ -26,6 +27,7 @@ export class SortImportsProvider {
       maxLineLength: config.get<number>('maxLineLength', 100),
       indent: config.get<string>('indentSize', '  '),
       aliasPrefixes: config.get<string[]>('aliasPrefixes', ['@/', '~/', 'src/']),
+      sortMode: config.get<'length' | 'alphabetical'>('sortMode', 'length'),
     };
   }
 
@@ -86,7 +88,7 @@ export class SortImportsProvider {
     idx = this.processDirectives(lines, idx, groups);
     idx = this.processImports(lines, idx, groups, config);
 
-    return this.buildResult(lines, idx, groups);
+    return this.buildResult(lines, idx, groups, config);
   }
 
   private processDirectives(
@@ -146,7 +148,7 @@ export class SortImportsProvider {
         }
 
         groups.interfaces.push(
-          this.sortInterfaceProperties(interfaceResult.block)
+          this.sortInterfaceProperties(interfaceResult.block, config)
         );
         idx = interfaceResult.nextIdx;
         continue;
@@ -330,7 +332,7 @@ export class SortImportsProvider {
     return null;
   }
 
-  private sortInterfaceProperties(interfaceBlock: string): string {
+  private sortInterfaceProperties(interfaceBlock: string, config: SortConfig): string {
     const openBraceIdx = interfaceBlock.indexOf('{');
     const closeBraceIdx = interfaceBlock.lastIndexOf('}');
 
@@ -345,7 +347,7 @@ export class SortImportsProvider {
     const sortedProperties = body
       .split('\n')
       .filter((line) => line.trim())
-      .sort((a, b) => a.trim().length - b.trim().length)
+      .sort((a, b) => this.compareStrings(a.trim(), b.trim(), config.sortMode))
       .join('\n');
 
     return `${header}\n${sortedProperties}\n${footer}`;
@@ -407,7 +409,7 @@ export class SortImportsProvider {
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean)
-      .sort((a, b) => a.length - b.length);
+      .sort((a, b) => this.compareStrings(a, b, config.sortMode));
 
     const singleLineImports = `{ ${imports.join(', ')} }`;
     const singleLineResult = `import ${singleLineImports} from ${fromPart}`;
@@ -444,27 +446,35 @@ export class SortImportsProvider {
   private buildResult(
     lines: string[],
     startIdx: number,
-    groups: ImportGroups
+    groups: ImportGroups,
+    config: SortConfig
   ): string {
     const output: string[] = [];
 
-    const sortByLength = (a: string, b: string) => a.length - b.length;
+    const sortByMode = (a: string, b: string) =>
+      this.compareStrings(a, b, config.sortMode);
+    const sortByLength = (a: string, b: string) =>
+      this.compareStrings(a, b, 'length');
 
     if (groups.directives.length) {
       output.push(...groups.directives, '');
     }
 
     if (groups.react.length) {
-      output.push(...groups.react.sort(sortByLength));
+      if (config.sortMode === 'alphabetical') {
+        output.push(...groups.react);
+      } else {
+        output.push(...groups.react.sort(sortByLength));
+      }
     }
 
     if (groups.libraries.length) {
-      output.push(...groups.libraries.sort(sortByLength));
+      output.push(...groups.libraries.sort(sortByMode));
     }
 
     if (groups.absolute.length) {
       if (groups.react.length || groups.libraries.length) output.push('');
-      output.push(...groups.absolute.sort(sortByLength));
+      output.push(...groups.absolute.sort(sortByMode));
     }
 
     if (groups.relative.length) {
@@ -475,7 +485,7 @@ export class SortImportsProvider {
       ) {
         output.push('');
       }
-      output.push(...groups.relative.sort(sortByLength));
+      output.push(...groups.relative.sort(sortByMode));
     }
 
     if (groups.sideEffect.length) {
@@ -487,7 +497,7 @@ export class SortImportsProvider {
       ) {
         output.push('');
       }
-      output.push(...groups.sideEffect.sort(sortByLength));
+      output.push(...groups.sideEffect.sort(sortByMode));
     }
 
     if (groups.styles.length) {
@@ -500,7 +510,7 @@ export class SortImportsProvider {
       ) {
         output.push('');
       }
-      output.push(...groups.styles.sort(sortByLength));
+      output.push(...groups.styles.sort(sortByMode));
     }
 
     if (groups.interfaces.length) {
@@ -577,5 +587,17 @@ export class SortImportsProvider {
     if (rest) output.push(rest);
 
     return output.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
+
+  private compareStrings(
+    a: string,
+    b: string,
+    mode: 'length' | 'alphabetical'
+  ): number {
+    if (mode === 'alphabetical') {
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    }
+
+    return a.length - b.length || a.localeCompare(b, undefined, { sensitivity: 'base' });
   }
 }
