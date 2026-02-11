@@ -13,21 +13,57 @@ interface ImportGroups {
   functions: string[];
 }
 
+type GroupKey =
+  | 'directives'
+  | 'react'
+  | 'libraries'
+  | 'absolute'
+  | 'relative'
+  | 'sideEffect'
+  | 'styles'
+  | 'interfaces'
+  | 'comments'
+  | 'functions';
+
+const DEFAULT_GROUP_ORDER: GroupKey[] = [
+  'directives',
+  'react',
+  'libraries',
+  'absolute',
+  'relative',
+  'sideEffect',
+  'styles',
+  'interfaces',
+  'comments',
+  'functions',
+];
+
 interface SortConfig {
   maxLineLength: number;
   indent: string;
   aliasPrefixes: string[];
   sortMode: 'length' | 'alphabetical';
+  styleExtensions: string[];
+  groupsOrder: GroupKey[];
 }
 
 export class SortImportsProvider {
   private getConfig(): SortConfig {
     const config = vscode.workspace.getConfiguration('sortImports');
+    const styleExtensions = this.normalizeStyleExtensions(
+      config.get<string[]>('styleExtensions', ['.css', '.scss', '.sass', '.less'])
+    );
+    const groupsOrder = this.normalizeGroupsOrder(
+      config.get<string[]>('groupsOrder', DEFAULT_GROUP_ORDER)
+    );
+
     return {
       maxLineLength: config.get<number>('maxLineLength', 100),
       indent: config.get<string>('indentSize', '  '),
       aliasPrefixes: config.get<string[]>('aliasPrefixes', ['@/', '~/', 'src/']),
       sortMode: config.get<'length' | 'alphabetical'>('sortMode', 'length'),
+      styleExtensions,
+      groupsOrder,
     };
   }
 
@@ -363,7 +399,7 @@ export class SortImportsProvider {
 
     if (sideEffectMatch) {
       const source = sideEffectMatch[1];
-      if (source.match(/\.(css|scss|sass|less)$/)) {
+      if (this.isStyleImport(source, config.styleExtensions)) {
         groups.styles.push(this.formatBlock(block, config));
       } else {
         groups.sideEffect.push(this.formatBlock(block, config));
@@ -379,7 +415,7 @@ export class SortImportsProvider {
     const source = sourceMatch[1];
     const formatted = this.formatBlock(block, config);
 
-    if (source.match(/\.(css|scss|sass|less)$/)) {
+    if (this.isStyleImport(source, config.styleExtensions)) {
       groups.styles.push(formatted);
     } else if (source === 'react' || source.startsWith('react/')) {
       groups.react.push(formatted);
@@ -449,144 +485,21 @@ export class SortImportsProvider {
     groups: ImportGroups,
     config: SortConfig
   ): string {
-    const output: string[] = [];
-
-    const sortByMode = (a: string, b: string) =>
-      this.compareStrings(a, b, config.sortMode);
-    const sortByLength = (a: string, b: string) =>
-      this.compareStrings(a, b, 'length');
-
-    if (groups.directives.length) {
-      output.push(...groups.directives, '');
-    }
-
-    if (groups.react.length) {
-      if (config.sortMode === 'alphabetical') {
-        output.push(...groups.react);
-      } else {
-        output.push(...groups.react.sort(sortByLength));
-      }
-    }
-
-    if (groups.libraries.length) {
-      output.push(...groups.libraries.sort(sortByMode));
-    }
-
-    if (groups.absolute.length) {
-      if (groups.react.length || groups.libraries.length) output.push('');
-      output.push(...groups.absolute.sort(sortByMode));
-    }
-
-    if (groups.relative.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length
-      ) {
-        output.push('');
-      }
-      output.push(...groups.relative.sort(sortByMode));
-    }
-
-    if (groups.sideEffect.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length
-      ) {
-        output.push('');
-      }
-      output.push(...groups.sideEffect.sort(sortByMode));
-    }
-
-    if (groups.styles.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length ||
-        groups.sideEffect.length
-      ) {
-        output.push('');
-      }
-      output.push(...groups.styles.sort(sortByMode));
-    }
-
-    if (groups.interfaces.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length ||
-        groups.sideEffect.length ||
-        groups.styles.length
-      ) {
-        output.push('');
-      }
-
-      output.push(...groups.interfaces);
-    }
-
-    if (groups.comments.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length ||
-        groups.sideEffect.length ||
-        groups.styles.length ||
-        groups.interfaces.length
-      ) {
-        output.push('');
-      }
-
-      const sortedComments = groups.comments
-        .sort((a, b) => a.originalIndex - b.originalIndex)
-        .map((comment) => comment.line);
-
-      output.push(...sortedComments);
-    }
-
-    if (groups.functions.length) {
-      if (
-        groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length ||
-        groups.sideEffect.length ||
-        groups.styles.length ||
-        groups.interfaces.length ||
-        groups.comments.length
-      ) {
-        output.push('');
-      }
-
-      groups.functions.forEach((func) => {
-        output.push(func);
-        output.push('');
-      });
-    }
-
+    const blocks: string[] = [];
     const rest = lines.slice(startIdx).join('\n').trim();
-    if (
-      rest &&
-      (groups.react.length ||
-        groups.libraries.length ||
-        groups.absolute.length ||
-        groups.relative.length ||
-        groups.sideEffect.length ||
-        groups.styles.length ||
-        groups.comments.length ||
-        groups.interfaces.length ||
-        groups.functions.length)
-    ) {
-      output.push('');
+
+    for (const group of config.groupsOrder) {
+      const block = this.getGroupBlock(group, groups, config);
+      if (block) {
+        blocks.push(block);
+      }
     }
 
-    if (rest) output.push(rest);
+    if (rest) {
+      blocks.push(rest);
+    }
 
-    return output.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
   private compareStrings(
@@ -599,5 +512,90 @@ export class SortImportsProvider {
     }
 
     return a.length - b.length || a.localeCompare(b, undefined, { sensitivity: 'base' });
+  }
+
+  private normalizeStyleExtensions(extensions: string[]): string[] {
+    const normalized = new Set<string>();
+
+    for (const ext of extensions) {
+      const trimmed = ext.trim().toLowerCase();
+      if (!trimmed) {
+        continue;
+      }
+      normalized.add(trimmed.startsWith('.') ? trimmed : `.${trimmed}`);
+    }
+
+    if (normalized.size === 0) {
+      return ['.css', '.scss', '.sass', '.less'];
+    }
+
+    return [...normalized];
+  }
+
+  private normalizeGroupsOrder(groupsOrder: string[]): GroupKey[] {
+    const valid = new Set<GroupKey>(DEFAULT_GROUP_ORDER);
+    const result: GroupKey[] = [];
+
+    for (const group of groupsOrder) {
+      if (valid.has(group as GroupKey) && !result.includes(group as GroupKey)) {
+        result.push(group as GroupKey);
+      }
+    }
+
+    for (const defaultGroup of DEFAULT_GROUP_ORDER) {
+      if (!result.includes(defaultGroup)) {
+        result.push(defaultGroup);
+      }
+    }
+
+    return result;
+  }
+
+  private isStyleImport(source: string, styleExtensions: string[]): boolean {
+    const normalized = source.toLowerCase();
+    return styleExtensions.some((ext) => normalized.endsWith(ext));
+  }
+
+  private getGroupBlock(
+    group: GroupKey,
+    groups: ImportGroups,
+    config: SortConfig
+  ): string | null {
+    const sortByMode = (a: string, b: string) =>
+      this.compareStrings(a, b, config.sortMode);
+    const sortByLength = (a: string, b: string) => this.compareStrings(a, b, 'length');
+
+    switch (group) {
+      case 'directives':
+        return groups.directives.length ? groups.directives.join('\n') : null;
+      case 'react':
+        if (!groups.react.length) return null;
+        return config.sortMode === 'alphabetical'
+          ? groups.react.join('\n')
+          : [...groups.react].sort(sortByLength).join('\n');
+      case 'libraries':
+        return groups.libraries.length ? [...groups.libraries].sort(sortByMode).join('\n') : null;
+      case 'absolute':
+        return groups.absolute.length ? [...groups.absolute].sort(sortByMode).join('\n') : null;
+      case 'relative':
+        return groups.relative.length ? [...groups.relative].sort(sortByMode).join('\n') : null;
+      case 'sideEffect':
+        return groups.sideEffect.length ? [...groups.sideEffect].sort(sortByMode).join('\n') : null;
+      case 'styles':
+        return groups.styles.length ? [...groups.styles].sort(sortByMode).join('\n') : null;
+      case 'interfaces':
+        return groups.interfaces.length ? groups.interfaces.join('\n') : null;
+      case 'comments': {
+        if (!groups.comments.length) return null;
+        const sortedComments = [...groups.comments]
+          .sort((a, b) => a.originalIndex - b.originalIndex)
+          .map((comment) => comment.line);
+        return sortedComments.join('\n');
+      }
+      case 'functions':
+        return groups.functions.length ? groups.functions.join('\n\n') : null;
+      default:
+        return null;
+    }
   }
 }
