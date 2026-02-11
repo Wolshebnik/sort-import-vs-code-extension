@@ -17,6 +17,7 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 - ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
 - 📝 **Context Menu:** Command available in editor context menu
 - 🎯 **Format Provider:** Works as a formatting provider
+- 💡 **Code Action:** Quick Fix / Source Action `Sort Imports`
 
 ## Import Grouping
 
@@ -35,7 +36,8 @@ Imports are grouped in the following order:
 
 ## Settings
 
-Default settings (used automatically if you don't set anything in `settings.json`):
+> [!IMPORTANT]
+> **Default settings are used automatically** if you don't set anything in `settings.json`.
 
 ```json
 {

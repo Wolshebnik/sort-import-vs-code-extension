@@ -97,6 +97,48 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
   context.subscriptions.push(formattingProvider);
+
+  const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+    ['javascript', 'typescript', 'javascriptreact', 'typescriptreact'],
+    {
+      provideCodeActions(
+        document: vscode.TextDocument
+      ): vscode.CodeAction[] {
+        if (!isSupportedLanguage(document.languageId)) {
+          return [];
+        }
+
+        const quickFixAction = new vscode.CodeAction(
+          'Sort Imports',
+          vscode.CodeActionKind.QuickFix
+        );
+        quickFixAction.command = {
+          command: 'sortImports.sortImports',
+          title: 'Sort Imports',
+        };
+        quickFixAction.isPreferred = true;
+
+        const sourceAction = new vscode.CodeAction(
+          'Sort Imports',
+          vscode.CodeActionKind.Source.append('sortImports')
+        );
+        sourceAction.command = {
+          command: 'sortImports.sortImports',
+          title: 'Sort Imports',
+        };
+
+        return [quickFixAction, sourceAction];
+      },
+    },
+    {
+      providedCodeActionKinds: [
+        vscode.CodeActionKind.QuickFix,
+        vscode.CodeActionKind.Source.append('sortImports'),
+      ],
+    }
+  );
+
+  context.subscriptions.push(codeActionProvider);
 }
 
 export function deactivate() {
