@@ -13,32 +13,41 @@ interface ImportGroups {
   functions: string[];
 }
 
+interface SortConfig {
+  maxLineLength: number;
+  indent: string;
+  aliasPrefixes: string[];
+}
+
 export class SortImportsProvider {
-  private getConfig() {
+  private getConfig(): SortConfig {
     const config = vscode.workspace.getConfiguration('sortImports');
     return {
-      maxLineLength: config.get<number>('maxLineLength', 100), // По умолчанию 100
-      indent: '  ', // Фиксированный отступ
-      aliasPrefixes: config.get<string[]>('aliasPrefixes', ['@/', '~']),
+      maxLineLength: config.get<number>('maxLineLength', 100),
+      indent: config.get<string>('indentSize', '  '),
+      aliasPrefixes: config.get<string[]>('aliasPrefixes', ['@/', '~/', 'src/']),
     };
   }
 
-  public sortImports(editor: vscode.TextEditor): void {
+  public async sortImports(editor: vscode.TextEditor): Promise<boolean> {
     const document = editor.document;
     const config = this.getConfig();
 
     const content = document.getText();
     const sortedContent = this.processContent(content, config);
 
-    if (sortedContent !== content) {
-      const edit = new vscode.WorkspaceEdit();
-      const fullRange = new vscode.Range(
-        document.positionAt(0),
-        document.positionAt(content.length)
-      );
-      edit.replace(document.uri, fullRange, sortedContent);
-      vscode.workspace.applyEdit(edit);
+    if (sortedContent === content) {
+      return false;
     }
+
+    const edit = new vscode.WorkspaceEdit();
+    const fullRange = new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(content.length)
+    );
+
+    edit.replace(document.uri, fullRange, sortedContent);
+    return vscode.workspace.applyEdit(edit);
   }
 
   public getFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {
@@ -57,7 +66,7 @@ export class SortImportsProvider {
     return [];
   }
 
-  private processContent(content: string, config: any): string {
+  private processContent(content: string, config: SortConfig): string {
     const lines = content.split(/\r?\n/);
     let idx = 0;
 
@@ -74,13 +83,9 @@ export class SortImportsProvider {
       functions: [],
     };
 
-    // Обработка директив use client/server
     idx = this.processDirectives(lines, idx, groups);
-
-    // Обработка импортов и интерфейсов
     idx = this.processImports(lines, idx, groups, config);
 
-    // Формирование результата
     return this.buildResult(lines, idx, groups);
   }
 
@@ -89,23 +94,17 @@ export class SortImportsProvider {
     startIdx: number,
     groups: ImportGroups
   ): number {
-    let idx = startIdx;
-    let foundDirective = false;
-
-    // Ищем директивы по всему блоку импортов, не только в начале
+    // Find directives anywhere in file and move them to top.
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const directive = line.match(/^['"](use (?:client|server))['"]\.?;?$/i);
       if (directive) {
         groups.directives.push(`'${directive[1]}';`);
-        // Удаляем найденную директиву из исходного массива
         lines[i] = '';
-        foundDirective = true;
-        break; // Берем только первую найденную директиву
       }
     }
 
-    // Пропускаем пустые строки в начале
+    let idx = startIdx;
     while (lines[idx]?.trim() === '') idx++;
 
     return idx;
@@ -115,195 +114,274 @@ export class SortImportsProvider {
     lines: string[],
     startIdx: number,
     groups: ImportGroups,
-    config: any
+    config: SortConfig
   ): number {
     let idx = startIdx;
-    let originalIndex = 0;
 
     while (idx < lines.length) {
       const line = lines[idx].trim();
+
       if (!line) {
         idx++;
-        originalIndex++;
         continue;
       }
 
-      // Проверяем на комментарий
       if (
         line.startsWith('//') ||
         line.startsWith('/*') ||
         line.startsWith('*')
       ) {
-        groups.comments.push({ line: lines[idx], originalIndex });
+        groups.comments.push({ line: lines[idx], originalIndex: idx });
         idx++;
-        originalIndex++;
         continue;
       }
 
-      // Проверяем на интерфейс (с поддержкой export)
       if (
         line.startsWith('interface ') ||
         line.startsWith('export interface ')
       ) {
-        let interfaceBlock = '';
-        let braceCount = 0;
-        let foundOpenBrace = false;
-
-        // Собираем весь блок интерфейса
-        while (idx < lines.length) {
-          const currentLine = lines[idx];
-          interfaceBlock += currentLine + '\n';
-
-          // Подсчитываем фигурные скобки
-          for (const char of currentLine) {
-            if (char === '{') {
-              braceCount++;
-              foundOpenBrace = true;
-            } else if (char === '}') {
-              braceCount--;
-            }
-          }
-
-          idx++;
-
-          // Если нашли открывающую скобку и количество скобок сбалансировано
-          if (foundOpenBrace && braceCount === 0) {
-            break;
-          }
+        const interfaceResult = this.collectBraceBlock(lines, idx);
+        if (!interfaceResult) {
+          break;
         }
 
-        // Сортируем интерфейс и добавляем в группу
-        const sortedInterface = this.sortInterfaceProperties(
-          interfaceBlock.trim(),
-          config
+        groups.interfaces.push(
+          this.sortInterfaceProperties(interfaceResult.block)
         );
-        groups.interfaces.push(sortedInterface);
-        originalIndex++;
+        idx = interfaceResult.nextIdx;
         continue;
       }
 
-      // Проверяем на функции
-      if (
-        line.startsWith('export const ') ||
-        line.startsWith('const ') ||
-        line.startsWith('export function ') ||
-        line.startsWith('function ') ||
-        line.startsWith('export default ') ||
-        line.startsWith('export {')
-      ) {
-        let functionBlock = '';
-        let braceCount = 0;
-        let foundOpenBrace = false;
-
-        // Собираем весь блок функции
-        while (idx < lines.length) {
-          const currentLine = lines[idx];
-          functionBlock += currentLine;
-
-          // Подсчитываем фигурные скобки
-          for (const char of currentLine) {
-            if (char === '{') {
-              braceCount++;
-              foundOpenBrace = true;
-            } else if (char === '}') {
-              braceCount--;
-            }
-          }
-
-          idx++;
-
-          // Если нашли открывающую скобку и количество скобок сбалансировано
-          if (foundOpenBrace && braceCount === 0) {
-            break;
-          }
-
-          // Если это не первая строка, добавляем перенос
-          if (idx < lines.length) {
-            functionBlock += '\n';
-          }
+      if (line.startsWith('type ') || line.startsWith('export type ')) {
+        const typeResult = this.collectTypeBlock(lines, idx);
+        if (!typeResult) {
+          break;
         }
 
-        groups.functions.push(functionBlock);
-        originalIndex++;
+        groups.interfaces.push(typeResult.block);
+        idx = typeResult.nextIdx;
         continue;
       }
 
-      // Если это не импорт, значит закончились импорты
+      if (this.isFunctionLikeStart(line)) {
+        const functionResult = this.collectFunctionBlock(lines, idx);
+        if (!functionResult) {
+          break;
+        }
+
+        groups.functions.push(functionResult.block);
+        idx = functionResult.nextIdx;
+        continue;
+      }
+
       if (!line.startsWith('import')) break;
 
-      let importBlock = '';
-      while (idx < lines.length && lines[idx].trim()) {
-        importBlock += lines[idx] + '\n';
-        idx++;
-        if (importBlock.includes(';')) break;
+      const importResult = this.collectImportBlock(lines, idx);
+      if (!importResult) {
+        break;
       }
 
-      this.classifyImport(importBlock.trim(), groups, config);
-      originalIndex++;
+      this.classifyImport(importResult.block, groups, config);
+      idx = importResult.nextIdx;
     }
 
     return idx;
   }
 
-  private sortInterfaceProperties(interfaceBlock: string, config: any): string {
-    const lines = interfaceBlock.split('\n');
+  private collectImportBlock(
+    lines: string[],
+    startIdx: number
+  ): { block: string; nextIdx: number } | null {
+    let idx = startIdx;
+    const blockLines: string[] = [];
 
-    // Находим строку с открывающей скобкой
-    let headerEndIndex = -1;
-    let footerStartIndex = -1;
+    while (idx < lines.length) {
+      blockLines.push(lines[idx]);
+      idx++;
 
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('{') && headerEndIndex === -1) {
-        headerEndIndex = i;
+      const block = blockLines.join('\n').trim();
+      if (this.isCompleteImport(block)) {
+        return { block, nextIdx: idx };
       }
-      if (lines[i].includes('}') && headerEndIndex !== -1) {
-        footerStartIndex = i;
+
+      if (idx < lines.length && !lines[idx].trim()) {
         break;
       }
     }
 
-    if (headerEndIndex === -1 || footerStartIndex === -1) {
-      return interfaceBlock; // Не удалось найти скобки, возвращаем как есть
+    return null;
+  }
+
+  private isCompleteImport(block: string): boolean {
+    const normalized = block.replace(/\s+/g, ' ').trim();
+
+    if (/^import\s+type\s+['"][^'"]+['"]\s*;?$/.test(normalized)) {
+      return true;
     }
 
-    // Извлекаем заголовок, свойства и футер
-    const header = lines.slice(0, headerEndIndex + 1);
-    const footer = lines.slice(footerStartIndex);
-    const properties = lines.slice(headerEndIndex + 1, footerStartIndex);
+    if (/^import\s+['"][^'"]+['"]\s*;?$/.test(normalized)) {
+      return true;
+    }
 
-    // Фильтруем и сортируем свойства по длине
-    const sortedProperties = properties
-      .filter((line) => line.trim()) // Убираем пустые строки
-      .sort((a, b) => a.trim().length - b.trim().length);
+    if (/^import\b[\s\S]*\bfrom\s+['"][^'"]+['"]\s*;?$/.test(normalized)) {
+      return true;
+    }
 
-    // Собираем результат
-    const result = [...header, ...sortedProperties, ...footer].join('\n');
+    return false;
+  }
 
-    return result;
+  private isFunctionLikeStart(line: string): boolean {
+    return (
+      line.startsWith('export const ') ||
+      line.startsWith('const ') ||
+      line.startsWith('export function ') ||
+      line.startsWith('function ') ||
+      line.startsWith('export default ') ||
+      line.startsWith('export {')
+    );
+  }
+
+  private collectFunctionBlock(
+    lines: string[],
+    startIdx: number
+  ): { block: string; nextIdx: number } | null {
+    const firstLine = lines[startIdx].trim();
+
+    if (firstLine.endsWith(';')) {
+      return { block: lines[startIdx], nextIdx: startIdx + 1 };
+    }
+
+    if (!firstLine.includes('{')) {
+      return null;
+    }
+
+    return this.collectBraceBlock(lines, startIdx);
+  }
+
+  private collectBraceBlock(
+    lines: string[],
+    startIdx: number
+  ): { block: string; nextIdx: number } | null {
+    let idx = startIdx;
+    let braceCount = 0;
+    let foundOpenBrace = false;
+    let block = '';
+
+    while (idx < lines.length) {
+      const currentLine = lines[idx];
+      block += currentLine + '\n';
+
+      for (const char of currentLine) {
+        if (char === '{') {
+          braceCount++;
+          foundOpenBrace = true;
+        } else if (char === '}') {
+          braceCount--;
+        }
+      }
+
+      idx++;
+
+      if (foundOpenBrace && braceCount === 0) {
+        return { block: block.trim(), nextIdx: idx };
+      }
+    }
+
+    return null;
+  }
+
+  private collectTypeBlock(
+    lines: string[],
+    startIdx: number
+  ): { block: string; nextIdx: number } | null {
+    let idx = startIdx;
+    const blockLines: string[] = [];
+    let braceCount = 0;
+    let parenCount = 0;
+    let bracketCount = 0;
+
+    while (idx < lines.length) {
+      const currentLine = lines[idx];
+      blockLines.push(currentLine);
+
+      for (const ch of currentLine) {
+        if (ch === '{') braceCount++;
+        else if (ch === '}') braceCount--;
+        else if (ch === '(') parenCount++;
+        else if (ch === ')') parenCount--;
+        else if (ch === '[') bracketCount++;
+        else if (ch === ']') bracketCount--;
+      }
+
+      idx++;
+
+      const trimmed = currentLine.trim();
+      const isComplete =
+        braceCount <= 0 &&
+        parenCount <= 0 &&
+        bracketCount <= 0 &&
+        (trimmed.endsWith(';') || trimmed.endsWith('}'));
+
+      if (isComplete) {
+        return { block: blockLines.join('\n').trim(), nextIdx: idx };
+      }
+    }
+
+    return null;
+  }
+
+  private sortInterfaceProperties(interfaceBlock: string): string {
+    const openBraceIdx = interfaceBlock.indexOf('{');
+    const closeBraceIdx = interfaceBlock.lastIndexOf('}');
+
+    if (openBraceIdx === -1 || closeBraceIdx === -1 || closeBraceIdx <= openBraceIdx) {
+      return interfaceBlock;
+    }
+
+    const header = interfaceBlock.slice(0, openBraceIdx + 1);
+    const body = interfaceBlock.slice(openBraceIdx + 1, closeBraceIdx);
+    const footer = interfaceBlock.slice(closeBraceIdx);
+
+    const sortedProperties = body
+      .split('\n')
+      .filter((line) => line.trim())
+      .sort((a, b) => a.trim().length - b.trim().length)
+      .join('\n');
+
+    return `${header}\n${sortedProperties}\n${footer}`;
   }
 
   private classifyImport(
     block: string,
     groups: ImportGroups,
-    config: any
+    config: SortConfig
   ): void {
-    if (!block.includes('from')) {
-      groups.sideEffect.push(this.formatBlock(block, config));
+    const normalizedBlock = block.replace(/\s+/g, ' ').trim();
+    const sideEffectMatch = normalizedBlock.match(/^import\s+['"]([^'"]+)['"]\s*;?$/);
+
+    if (sideEffectMatch) {
+      const source = sideEffectMatch[1];
+      if (source.match(/\.(css|scss|sass|less)$/)) {
+        groups.styles.push(this.formatBlock(block, config));
+      } else {
+        groups.sideEffect.push(this.formatBlock(block, config));
+      }
       return;
     }
 
-    const sourceMatch = block.match(/from\s+['"](.+?)['"]/);
-    if (!sourceMatch) return;
+    const sourceMatch = normalizedBlock.match(/\bfrom\s+['"]([^'"]+)['"]\s*;?$/);
+    if (!sourceMatch) {
+      return;
+    }
 
     const source = sourceMatch[1];
     const formatted = this.formatBlock(block, config);
 
-    // Проверяем стили (css, scss, sass, less файлы)
     if (source.match(/\.(css|scss|sass|less)$/)) {
       groups.styles.push(formatted);
     } else if (source === 'react' || source.startsWith('react/')) {
       groups.react.push(formatted);
-    } else if (config.aliasPrefixes.some((p: string) => source.startsWith(p))) {
+    } else if (this.isAliasImport(source, config.aliasPrefixes)) {
       groups.absolute.push(formatted);
     } else if (source.startsWith('.') || source.startsWith('/')) {
       groups.relative.push(formatted);
@@ -314,16 +392,14 @@ export class SortImportsProvider {
     }
   }
 
-  private formatBlock(block: string, config: any): string {
+  private formatBlock(block: string, config: SortConfig): string {
     if (!block.includes('{')) return block;
 
-    // Нормализуем блок - убираем переносы строк для парсинга
     const normalizedBlock = block.replace(/\s+/g, ' ').trim();
     const [importPart, fromPart] = normalizedBlock.split(/\s+from\s+/);
 
     if (!fromPart) return block;
 
-    // Извлекаем импорты из фигурных скобок
     const importsMatch = importPart.match(/import\s*\{([^}]+)\}/);
     if (!importsMatch) return block;
 
@@ -331,9 +407,8 @@ export class SortImportsProvider {
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean)
-      .sort((a, b) => a.length - b.length); // Сортировка по длине
+      .sort((a, b) => a.length - b.length);
 
-    // Формируем однострочный вариант и проверяем его длину
     const singleLineImports = `{ ${imports.join(', ')} }`;
     const singleLineResult = `import ${singleLineImports} from ${fromPart}`;
 
@@ -349,8 +424,21 @@ export class SortImportsProvider {
     return (
       !source.startsWith('.') &&
       !source.startsWith('/') &&
-      !aliasPrefixes.some((p) => source.startsWith(p))
+      !this.isAliasImport(source, aliasPrefixes)
     );
+  }
+
+  private isAliasImport(source: string, aliasPrefixes: string[]): boolean {
+    return aliasPrefixes.some((prefix) => {
+      const trimmed = prefix.trim();
+      if (!trimmed) return false;
+
+      if (trimmed.endsWith('/')) {
+        return source.startsWith(trimmed);
+      }
+
+      return source === trimmed || source.startsWith(`${trimmed}/`);
+    });
   }
 
   private buildResult(
@@ -360,54 +448,48 @@ export class SortImportsProvider {
   ): string {
     const output: string[] = [];
 
-    // Функция сортировки по длине строки
     const sortByLength = (a: string, b: string) => a.length - b.length;
 
-    // 1. 'use client'/'use server' директивы (всегда первые)
     if (groups.directives.length) {
-      output.push(groups.directives[0], '');
+      output.push(...groups.directives, '');
     }
 
-    // 2. React импорты (без пустой строки между ними)
     if (groups.react.length) {
       output.push(...groups.react.sort(sortByLength));
     }
 
-    // 3. Библиотеки (без пустой строки после React импортов)
     if (groups.libraries.length) {
       output.push(...groups.libraries.sort(sortByLength));
     }
 
-    // 4. Абсолютные импорты (с пустой строкой)
     if (groups.absolute.length) {
       if (groups.react.length || groups.libraries.length) output.push('');
       output.push(...groups.absolute.sort(sortByLength));
     }
 
-    // 5. Относительные импорты (с пустой строкой)
     if (groups.relative.length) {
       if (
         groups.react.length ||
         groups.libraries.length ||
         groups.absolute.length
-      )
+      ) {
         output.push('');
+      }
       output.push(...groups.relative.sort(sortByLength));
     }
 
-    // 6. Side effect импорты (без from) (с пустой строкой)
     if (groups.sideEffect.length) {
       if (
         groups.react.length ||
         groups.libraries.length ||
         groups.absolute.length ||
         groups.relative.length
-      )
+      ) {
         output.push('');
+      }
       output.push(...groups.sideEffect.sort(sortByLength));
     }
 
-    // 7. Стили (с пустой строкой)
     if (groups.styles.length) {
       if (
         groups.react.length ||
@@ -415,12 +497,12 @@ export class SortImportsProvider {
         groups.absolute.length ||
         groups.relative.length ||
         groups.sideEffect.length
-      )
+      ) {
         output.push('');
+      }
       output.push(...groups.styles.sort(sortByLength));
     }
 
-    // 8. Интерфейсы (после всех импортов)
     if (groups.interfaces.length) {
       if (
         groups.react.length ||
@@ -436,7 +518,6 @@ export class SortImportsProvider {
       output.push(...groups.interfaces);
     }
 
-    // 9. Комментарии в исходном порядке (после интерфейсов)
     if (groups.comments.length) {
       if (
         groups.react.length ||
@@ -450,7 +531,6 @@ export class SortImportsProvider {
         output.push('');
       }
 
-      // Сортируем комментарии по исходному порядку
       const sortedComments = groups.comments
         .sort((a, b) => a.originalIndex - b.originalIndex)
         .map((comment) => comment.line);
@@ -458,7 +538,6 @@ export class SortImportsProvider {
       output.push(...sortedComments);
     }
 
-    // 10. Функции (в самом конце)
     if (groups.functions.length) {
       if (
         groups.react.length ||
@@ -473,15 +552,12 @@ export class SortImportsProvider {
         output.push('');
       }
 
-      // Добавляем функции с пустыми строками между ними
-      groups.functions.forEach((func, index) => {
+      groups.functions.forEach((func) => {
         output.push(func);
-        // Добавляем пустую строку после каждой функции (включая последнюю)
         output.push('');
       });
     }
 
-    // Добавляем пустую строку после импортов, если есть другой код
     const rest = lines.slice(startIdx).join('\n').trim();
     if (
       rest &&
@@ -500,11 +576,6 @@ export class SortImportsProvider {
 
     if (rest) output.push(rest);
 
-    return (
-      output
-        .join('\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim() + '\n'
-    );
+    return output.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 }

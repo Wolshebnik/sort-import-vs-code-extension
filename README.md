@@ -24,11 +24,11 @@ Imports are grouped in the following order:
 1. **Directives** — 'use client', 'use server'
 2. **React** — react and react/\*
 3. **External Libraries** — npm packages
-4. **Absolute Imports** — paths with aliases (@/, ~)
+4. **Absolute Imports** — paths with aliases (@/, ~/, src/)
 5. **Relative Imports** — local files (., ..)
 6. **Side Effect Imports** — imports without from
 7. **Styles** — CSS, SCSS, SASS, LESS files
-8. **Interfaces** — TypeScript interfaces (including export interface) with properties sorted by length
+8. **Interfaces and Types** — TypeScript `interface` and `type` declarations (including `export`) placed after imports; interface properties are sorted by length
 9. **Comments** — preserved in their original order after imports
 10. **Functions** — const, function, export const, export function declarations (at the very end)
 
@@ -39,7 +39,8 @@ You can configure the extension through VS Code settings:
 ```json
 {
   "sortImports.maxLineLength": 100, // Maximum import line length
-  "sortImports.aliasPrefixes": ["@/", "~"] // Prefixes for absolute paths
+  "sortImports.indentSize": "  ", // Indentation for wrapped imports
+  "sortImports.aliasPrefixes": ["@/", "~/", "src/"] // Extendable alias list
 }
 ```
 
