@@ -2,7 +2,7 @@
   "name": "sort-imports",
   "displayName": "Automatic Import Sorter",
   "description": "Automatically sort and organize JavaScript/TypeScript imports with smart grouping and configurable modes",
-  "version": "1.3.3",
+  "version": "1.3.5",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -69,6 +69,52 @@
             "src/"
           ],
           "description": "Prefixes that should be treated as absolute imports"
+        },
+        "sortImports.styleExtensions": {
+          "type": "array",
+          "default": [
+            ".css",
+            ".scss",
+            ".sass",
+            ".less"
+          ],
+          "description": "File extensions that should be grouped as style imports"
+        },
+        "sortImports.groupsOrder": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "directives",
+              "react",
+              "libraries",
+              "absolute",
+              "relative",
+              "sideEffect",
+              "styles",
+              "interfaces",
+              "comments",
+              "functions"
+            ]
+          },
+          "default": [
+            "directives",
+            "react",
+            "libraries",
+            "absolute",
+            "relative",
+            "sideEffect",
+            "styles",
+            "interfaces",
+            "comments",
+            "functions"
+          ],
+          "description": "Custom output order for import and related groups"
+        },
+        "sortImports.sortOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically sort imports when a supported file is saved"
         },
         "sortImports.sortMode": {
           "type": "string",

@@ -17,6 +17,7 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 - ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
 - 📝 **Context Menu:** Command available in editor context menu
 - 🎯 **Format Provider:** Works as a formatting provider
+- 💡 **Code Action:** Quick Fix / Source Action `Sort Imports`
 
 ## Import Grouping
 
@@ -35,13 +36,28 @@ Imports are grouped in the following order:
 
 ## Settings
 
-Default settings (used automatically if you don't set anything in `settings.json`):
+> [!IMPORTANT]
+> **Default settings are used automatically** if you don't set anything in `settings.json`.
 
 ```json
 {
   "sortImports.maxLineLength": 100,
   "sortImports.indentSize": "  ",
   "sortImports.aliasPrefixes": ["@/", "~/", "src/"],
+  "sortImports.styleExtensions": [".css", ".scss", ".sass", ".less"],
+  "sortImports.groupsOrder": [
+    "directives",
+    "react",
+    "libraries",
+    "absolute",
+    "relative",
+    "sideEffect",
+    "styles",
+    "interfaces",
+    "comments",
+    "functions"
+  ],
+  "sortImports.sortOnSave": false,
   "sortImports.sortMode": "length"
 }
 ```
@@ -53,6 +69,20 @@ To override and extend settings, add only the values you want to change in your 
 ```json
 {
   "sortImports.maxLineLength": 120,
+  "sortImports.sortOnSave": true,
+  "sortImports.styleExtensions": [".css", ".scss", ".sass", ".less", ".pcss"],
+  "sortImports.groupsOrder": [
+    "directives",
+    "react",
+    "libraries",
+    "absolute",
+    "styles",
+    "relative",
+    "sideEffect",
+    "interfaces",
+    "comments",
+    "functions"
+  ],
   "sortImports.aliasPrefixes": ["@/", "~/", "src/", "@core/", "@shared/"],
   "sortImports.sortMode": "alphabetical"
 }
@@ -62,6 +92,9 @@ Notes:
 - `sortImports.maxLineLength`: maximum line length before wrapping imports.
 - `sortImports.indentSize`: indentation used for wrapped import lines.
 - `sortImports.aliasPrefixes`: alias prefixes used to detect absolute imports. Extend this array with your project aliases.
+- `sortImports.styleExtensions`: extensions treated as style imports.
+- `sortImports.groupsOrder`: custom output order. Available groups: `directives`, `react`, `libraries`, `absolute`, `relative`, `sideEffect`, `styles`, `interfaces`, `comments`, `functions`.
+- `sortImports.sortOnSave`: automatically sort imports on file save.
 - `sortImports.sortMode`: `length` (default behavior) or `alphabetical`.
 - In `length` mode, sorting behavior remains the current default (by length).
 - In `alphabetical` mode, non-React import groups are sorted alphabetically, and named imports inside `{ ... }` are sorted alphabetically.
