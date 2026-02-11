@@ -13,6 +13,7 @@ Automatically sorts and organizes imports in JavaScript and TypeScript files by 
 - 🔧 **Interface Sorting:** Interface properties are sorted by length within the interface body
 - ⚡ **Function Extraction:** Functions and constants are extracted from import blocks and placed after
 - ⚙️ **Configurable:** Ability to change maximum line length and path aliases
+- 🔤 **Sorting Modes:** `length` (default) or `alphabetical`
 - ⌨️ **Keyboard Shortcuts:** Ctrl+Alt+O (Windows/Linux) or Cmd+Alt+O (macOS)
 - 📝 **Context Menu:** Command available in editor context menu
 - 🎯 **Format Provider:** Works as a formatting provider
@@ -24,24 +25,46 @@ Imports are grouped in the following order:
 1. **Directives** — 'use client', 'use server'
 2. **React** — react and react/\*
 3. **External Libraries** — npm packages
-4. **Absolute Imports** — paths with aliases (@/, ~)
+4. **Absolute Imports** — paths with aliases (@/, ~/, src/)
 5. **Relative Imports** — local files (., ..)
 6. **Side Effect Imports** — imports without from
 7. **Styles** — CSS, SCSS, SASS, LESS files
-8. **Interfaces** — TypeScript interfaces (including export interface) with properties sorted by length
+8. **Interfaces and Types** — TypeScript `interface` and `type` declarations (including `export`) placed after imports; interface properties are sorted by length
 9. **Comments** — preserved in their original order after imports
 10. **Functions** — const, function, export const, export function declarations (at the very end)
 
 ## Settings
 
-You can configure the extension through VS Code settings:
+Default settings (used automatically if you don't set anything in `settings.json`):
 
 ```json
 {
-  "sortImports.maxLineLength": 100, // Maximum import line length
-  "sortImports.aliasPrefixes": ["@/", "~"] // Prefixes for absolute paths
+  "sortImports.maxLineLength": 100,
+  "sortImports.indentSize": "  ",
+  "sortImports.aliasPrefixes": ["@/", "~/", "src/"],
+  "sortImports.sortMode": "length"
 }
 ```
+
+You do not need to copy default values into `settings.json` unless you want to change them.
+
+To override and extend settings, add only the values you want to change in your workspace or user `settings.json`:
+
+```json
+{
+  "sortImports.maxLineLength": 120,
+  "sortImports.aliasPrefixes": ["@/", "~/", "src/", "@core/", "@shared/"],
+  "sortImports.sortMode": "alphabetical"
+}
+```
+
+Notes:
+- `sortImports.maxLineLength`: maximum line length before wrapping imports.
+- `sortImports.indentSize`: indentation used for wrapped import lines.
+- `sortImports.aliasPrefixes`: alias prefixes used to detect absolute imports. Extend this array with your project aliases.
+- `sortImports.sortMode`: `length` (default behavior) or `alphabetical`.
+- In `length` mode, sorting behavior remains the current default (by length).
+- In `alphabetical` mode, non-React import groups are sorted alphabetically, and named imports inside `{ ... }` are sorted alphabetically.
 
 ## Demo
 

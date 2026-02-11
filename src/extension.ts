@@ -9,7 +9,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Регистрируем команду для сортировки импортов
   const disposable = vscode.commands.registerCommand(
     'sortImports.sortImports',
-    () => {
+    async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showErrorMessage('No active editor found');
@@ -35,8 +35,12 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        provider.sortImports(editor);
-        vscode.window.showInformationMessage('Imports sorted successfully!');
+        const didChange = await provider.sortImports(editor);
+        if (didChange) {
+          vscode.window.showInformationMessage('Imports sorted successfully!');
+        } else {
+          vscode.window.showInformationMessage('No import changes were needed.');
+        }
       } catch (error) {
         vscode.window.showErrorMessage(`Error sorting imports: ${error}`);
       }
